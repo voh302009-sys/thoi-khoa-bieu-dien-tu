@@ -3,180 +3,161 @@
 <head>
 <meta charset="UTF-8">
 <title>Thời Khóa Biểu Điện Tử</title>
+
 <style>
-body{font-family:Segoe UI,Arial,sans-serif;margin:20px}
-h1{margin-bottom:10px}
-table{border-collapse:collapse;width:100%}
-th,td{border:1px solid #ccc;padding:10px;text-align:center;vertical-align:top}
-th{background:#f2f2f2}
-.subject-name{color:red;font-weight:bold}
-.lecturer{color:blue;font-style:italic}
-.cell-item{border-bottom:1px dashed #ccc;padding:6px 0}
-.cell-item:last-child{border-bottom:none}
-.conflict{background:#ffd6d6}
-.campus-warning{margin-top:4px;color:#b58900;font-style:italic;font-size:13px}
-.login,.form,.month-filter{margin-bottom:15px}
-button{padding:5px 10px;margin-top:6px}
-@media print{
-.login,.form,.month-filter,button{display:none!important}
+body { font-family: Arial; margin: 20px }
+table { width:100%; border-collapse: collapse }
+th,td { border:1px solid #ccc; padding:10px; text-align:center; vertical-align:top }
+th { background:#f2f2f2 }
+
+.subject { color:red; font-weight:bold }
+.gv { color:blue; font-style:italic }
+.warn { color:#b58900; font-size:13px; font-style:italic }
+.conflict { background:#ffd6d6 }
+
+.login,.form,.month { margin-bottom:15px }
+button { padding:6px 12px; margin-top:5px }
+
+@media print {
+  .login,.form,.month,button { display:none }
 }
 </style>
 </head>
+
 <body>
 
-<h1>Thời khóa biểu (chia theo phòng & thứ)</h1>
+<h1>Thời khóa biểu</h1>
 
 <div class="login">
-<label>Vai trò:
-<select id="role">
-<option value="student">Sinh viên</option>
-<option value="lecturer">Giảng viên</option>
-</select>
-</label>
-<label>Mật khẩu:
-<input type="password" id="password">
-</label>
-<button onclick="login()">Đăng nhập</button>
+  <select id="role">
+    <option value="student">Sinh viên</option>
+    <option value="lecturer">Giảng viên</option>
+  </select>
+  <input id="password" type="password" placeholder="Mật khẩu">
+  <button onclick="login()">Đăng nhập</button>
 </div>
 
-<div class="form" id="editForm" style="display:none">
-<h3>Nhập môn học</h3>
-<input id="subject" placeholder="Tên môn"><br>
-<select id="type"><option value="LT">LT</option><option value="TH">TH</option></select>
-<input id="credits" type="number" placeholder="TC"><br>
-<input id="code" placeholder="Mã HP"><br>
-<select id="day">
-<option>Thứ 2</option><option>Thứ 3</option><option>Thứ 4</option>
-<option>Thứ 5</option><option>Thứ 6</option><option>Thứ 7</option>
-</select>
-<select id="session"><option>Sáng</option><option>Chiều</option></select><br>
-<input id="time" placeholder="09:10-11:40"><br>
-<input id="room" placeholder="ADV, A.103"><br>
-<input id="lecturer" placeholder="Tên GV"><br>
-<input id="start" type="date"> → <input id="end" type="date"><br>
-<button onclick="addClass()">Thêm</button>
+<div class="form" id="form" style="display:none">
+  <input id="subject" placeholder="Tên môn"><br>
+  <select id="type"><option>LT</option><option>TH</option></select>
+  <input id="credits" type="number" placeholder="TC"><br>
+  <input id="code" placeholder="Mã học phần"><br>
+  <select id="day">
+    <option>Thứ 2</option><option>Thứ 3</option><option>Thứ 4</option>
+    <option>Thứ 5</option><option>Thứ 6</option><option>Thứ 7</option>
+  </select>
+  <select id="session"><option>Sáng</option><option>Chiều</option></select><br>
+  <input id="time" placeholder="06:30-09:00"><br>
+  <input id="room" placeholder="ADV, A.103"><br>
+  <input id="lecturer" placeholder="Giảng viên"><br>
+  <input id="start" type="date"> → <input id="end" type="date"><br>
+  <button onclick="addClass()">Thêm</button>
 </div>
 
-<div class="month-filter" style="display:none">
-<label>Lọc theo tháng:
-<input type="month" id="monthFilter">
-</label>
+<div class="month" style="display:none">
+  <input type="month" id="month">
 </div>
 
-<table id="tkb">
+<table>
 <thead>
 <tr>
-<th>Phòng</th>
-<th>Thứ 2</th><th>Thứ 3</th><th>Thứ 4</th>
-<th>Thứ 5</th><th>Thứ 6</th><th>Thứ 7</th>
+  <th>Phòng</th>
+  <th>Thứ 2</th><th>Thứ 3</th><th>Thứ 4</th>
+  <th>Thứ 5</th><th>Thứ 6</th><th>Thứ 7</th>
 </tr>
 </thead>
-<tbody></tbody>
+<tbody id="body"></tbody>
 </table>
 
 <script>
-/* ====== AUTH ====== */
-const passwords={student:'sv123',lecturer:'gv123'};
-let currentUserRole=null;
+const passwords = { student:"sv123", lecturer:"gv123" }
+let role = null
+let filterMonth = null
+let data = JSON.parse(localStorage.getItem("tkb") || "{}")
 
-/* ====== DATA ====== */
-let schedule=JSON.parse(localStorage.getItem('schedule')||'{}');
-let filterMonth=null;
-
-/* ====== LOGIN ====== */
 function login(){
-const role=document.getElementById('role').value;
-const pass=document.getElementById('password').value;
-if(pass!==passwords[role]) return alert('Sai mật khẩu');
-currentUserRole=role;
-document.querySelector('.login').style.display='none';
-document.querySelector('.month-filter').style.display='block';
-if(role==='lecturer') document.getElementById('editForm').style.display='block';
-render();
+  const r = document.getElementById("role").value
+  const p = document.getElementById("password").value
+  if(p !== passwords[r]) return alert("Sai mật khẩu")
+  role = r
+  document.querySelector(".login").style.display="none"
+  document.querySelector(".month").style.display="block"
+  if(r==="lecturer") document.getElementById("form").style.display="block"
+  render()
 }
 
-/* ====== TIME UTILS ====== */
-function parseTime(t){const[h,m]=t.split(':').map(Number);return h*60+m;}
-function overlap(t1,t2){
-const[s1,e1]=t1.split('-').map(parseTime);
-const[s2,e2]=t2.split('-').map(parseTime);
-return !(e1<=s2||e2<=s1);
-}
-function getCampus(room){return room.split(',')[0].trim().toUpperCase();}
-
-/* ====== MONTH FILTER ====== */
-function inMonth(c){
-if(!filterMonth||!c.start||!c.end) return true;
-const[y,m]=filterMonth.split('-').map(Number);
-return !(new Date(c.end)<new Date(y,m-1,1)||new Date(c.start)>new Date(y,m,0));
-}
-
-/* ====== ADD ====== */
 function addClass(){
-if(currentUserRole!=='lecturer') return;
-const c={
-subject:subject.value,type:type.value,credits:credits.value,
-code:code.value,day:day.value,session:session.value,
-time:time.value,room:room.value,lecturer:lecturer.value,
-start:start.value,end:end.value
-};
-if(!c.subject||!c.room||!c.time) return alert('Thiếu dữ liệu');
-schedule[c.room]=schedule[c.room]||{};
-schedule[c.room][c.day]=schedule[c.room][c.day]||[];
-schedule[c.room][c.day].push(c);
-localStorage.setItem('schedule',JSON.stringify(schedule));
-render();
+  const c = {
+    subject:subject.value, type:type.value, credits:credits.value,
+    code:code.value, day:day.value, session:session.value,
+    time:time.value, room:room.value, lecturer:lecturer.value,
+    start:start.value, end:end.value
+  }
+  if(!data[c.room]) data[c.room]={}
+  if(!data[c.room][c.day]) data[c.room][c.day]=[]
+  data[c.room][c.day].push(c)
+  localStorage.setItem("tkb",JSON.stringify(data))
+  render()
 }
 
-/* ====== RENDER ====== */
+function overlap(a,b){
+  const p=x=>x.split("-").map(t=>{
+    let [h,m]=t.split(":"); return h*60+ +m
+  })
+  let [s1,e1]=p(a),[s2,e2]=p(b)
+  return !(e1<=s2||e2<=s1)
+}
+
 function render(){
-const tbody=document.querySelector('#tkb tbody');
-tbody.innerHTML='';
-Object.keys(schedule).sort().forEach(room=>{
-let row=`<td><b>${room}</b></td>`;
-['Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7'].forEach(day=>{
-let html='';
-const list=(schedule[room][day]||[]).filter(inMonth);
-list.forEach((c,i)=>{
-// lấy các môn cùng buổi để check
-let sameSession=[];
-for(const r in schedule){
-(schedule[r][day]||[]).forEach(o=>{
-if(o.session===c.session&&inMonth(o)) sameSession.push(o);
-});
-}
-const conflict=sameSession.some(o=>o!==c&&overlap(o.time,c.time));
-const campuses=[...new Set(sameSession.map(x=>getCampus(x.room)))];
-html+=`
-<div class="cell-item ${conflict?'conflict':''}">
-<div class="subject-name">${c.subject} (${c.type}) – ${c.credits} TC</div>
-<div>${c.session} ${c.time}</div>
-<div>${c.room}</div>
-<div class="lecturer">GV: ${c.lecturer}</div>
-${campuses.length>1?'<div class="campus-warning">⚠ Khác cơ sở</div>':''}
-${currentUserRole==='lecturer'
-?`<button onclick="del('${room}','${day}',${i})">Xóa</button>`:''}
-</div>`;
-});
-row+=`<td>${html}</td>`;
-});
-tbody.innerHTML+=`<tr>${row}</tr>`;
-});
+  const b=document.getElementById("body"); b.innerHTML=""
+  Object.keys(data).sort().forEach(r=>{
+    let show=false
+    Object.values(data[r]).flat().forEach(c=>{
+      if(!filterMonth) show=true
+      else{
+        let d=new Date(c.start)
+        if(c.start.startsWith(filterMonth)) show=true
+      }
+    })
+    if(!show) return
+    let tr=`<tr><td><b>${r}</b></td>`
+    ;["Thứ 2","Thứ 3","Thứ 4","Thứ 5","Thứ 6","Thứ 7"].forEach(d=>{
+      let cell=""
+      if(data[r][d]){
+        data[r][d].forEach((c,i)=>{
+          let conflict=false
+          Object.keys(data).forEach(rr=>{
+            data[rr][d]?.forEach(o=>{
+              if(o!==c && o.session===c.session && overlap(o.time,c.time))
+                conflict=true
+            })
+          })
+          cell+=`
+          <div class="${conflict?'conflict':''}">
+            <div class="subject">${c.subject} (${c.type}) - ${c.credits} TC</div>
+            ${c.session} ${c.time}<br>${c.room}<br>
+            <span class="gv">GV: ${c.lecturer}</span>
+            ${role==="lecturer"?`<br><button onclick="del('${r}','${d}',${i})">Xóa</button>`:""}
+          </div>`
+        })
+      }
+      tr+=`<td>${cell}</td>`
+    })
+    b.innerHTML+=tr+"</tr>"
+  })
 }
 
-/* ====== DELETE ====== */
 function del(r,d,i){
-if(currentUserRole!=='lecturer') return;
-if(!confirm('Xóa môn này?')) return;
-schedule[r][d].splice(i,1);
-localStorage.setItem('schedule',JSON.stringify(schedule));
-render();
+  if(!confirm("Xóa?")) return
+  data[r][d].splice(i,1)
+  localStorage.setItem("tkb",JSON.stringify(data))
+  render()
 }
 
-document.getElementById('monthFilter').onchange=e=>{
-filterMonth=e.target.value;
-render();
-};
+document.getElementById("month").onchange=e=>{
+  filterMonth=e.target.value
+  render()
+}
 </script>
 </body>
 </html>
