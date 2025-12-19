@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>Thời Khóa Biểu Điện Tử</title>
+  <style>
+    body { font-family: "Segoe UI", Arial, sans-serif; margin: 20px; }
+    h1 { margin-bottom: 10px; }
+
+    table { border-collapse: collapse; width: 100%; }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 10px;
+      text-align: center;
+      vertical-align: middle;
+    }
+    th { background: #f2f2f2; }
+
+    .subject-name { color: red; font-weight: bold; }
+    .lecturer { color: blue; font-style: italic; }
+
+    .cell-item {
+      border-bottom: 1px dashed #ccc;
+      padding: 6px 0;
+      margin-bottom: 4px;
+    }
+    .cell-item:last-child { border-bottom: none; margin-bottom: 0; }
+
+    .campus-warning {
+      margin-top: 4px;
+      color: #b58900;
+      font-style: italic;
+      font-size: 13px;
+    }
+
+    .conflict {
+      background: #ffd6d6;
+    }
+
+    .login, .form { margin-bottom: 20px; }
+    label { display: block; margin-top: 6px; }
+    input, select { width: 280px; padding: 4px; }
+    button { margin-top: 8px; padding: 6px 12px; }
+
+    .month-filter {
+      margin-bottom: 15px;
+    }
+
+    @media print {
+      .login, .form, .print-btn, button, .month-filter { display: none !important; }
+      body { margin: 0; }
+      table { font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+
+<h1>
+  Thời khóa biểu (chia theo phòng & thứ)
+  <span class="print-btn" style="cursor:pointer;font-size:15px;color:#555" onclick="window.print()">In thời khóa biểu</span>
+</h1>
+
+<div class="login">
+  <label>Vai trò:
+    <select id="role">
+      <option value="student">Sinh viên</option>
+      <option value="lecturer">Giảng viên</option>
+    </select>
+  </label>
+  <label>Mật khẩu:
+    <input type="password" id="password" />
+    <input type="checkbox" onclick="togglePassword()"> Hiện mật khẩu
+  </label>
+  <button onclick="login()">Đăng nhập</button>
+</div>
+
+<div class="form" id="editForm" style="display:none">
+  <h2>Nhập môn học</h2>
+  <label>Tên học phần: <input id="subject"></label>
+  <label>Loại môn:
+    <select id="type">
+      <option value="LT">Lí thuyết (LT)</option>
+      <option value="TH">Thực hành (TH)</option>
+    </select>
+  </label>
+  <label>Số tín chỉ: <input id="credits" type="number" min="1"></label>
+  <label>Mã học phần: <input id="code"></label>
+  <label>Thứ:
+    <select id="day">
+      <option>Thứ 2</option><option>Thứ 3</option><option>Thứ 4</option>
+      <option>Thứ 5</option><option>Thứ 6</option><option>Thứ 7</option>
+    </select>
+  </label>
+  <label>Buổi:
+    <select id="session"><option>Sáng</option><option>Chiều</option></select>
+  </label>
+  <label>Giờ học: <input id="time" placeholder="06:00-09:10"></label>
+  <label>Phòng (Cơ sở, Phòng): <input id="room" placeholder="ADV, A.103 | LVS, B.201 | LLQ, C.305"></label>
+  <label>Giảng viên: <input id="lecturer" placeholder="Nguyễn Văn A"></label>
+  <label>Thời gian học:
+    <input id="start" type="date"> → <input id="end" type="date">
+  </label>
+  <button onclick="addClass()">Thêm</button>
+</div>
+
+<div class="month-filter" style="display:none;">
+  <label>Xem theo tháng: 
+    <input type="month" id="monthFilter" />
+  </label>
+</div>
+
+<table id="tkb">
+  <thead>
+    <tr>
+      <th>Phòng</th>
+      <th>Thứ 2</th><th>Thứ 3</th><th>Thứ 4</th>
+      <th>Thứ 5</th><th>Thứ 6</th><th>Thứ 7</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<script>
+let passwords = { student: 'sv123', lecturer: 'gv123' };
+let schedule = JSON.parse(localStorage.getItem('schedule') || '{}');
+if (Object.keys(schedule).length === 0) {
+  schedule = {
+    "ADV, A.103": {
+      "Thứ 3": [
+        {
+          subject: "LỊCH SỬ ĐẢNG CỘNG SẢN VIỆT NAM",
+          type: "LT",
+          credits: "3",
+          code: "LSĐCSVN",
+          day: "Thứ 3",
+          session: "Sáng",
+          time: "09:10-11:40",
+          room: "ADV, A.103",
+          lecturer: "Nguyễn Văn A",
+          start: "2025-01-01",
+          end: "2025-05-30"
+        }
+      ]
+    }
+  };
+  localStorage.setItem("schedule", JSON.stringify(schedule));
+}
+let currentUserRole = null;
+
+function togglePassword() {
+  const p = document.getElementById('password');
+  p.type = p.type === 'password' ? 'text' : 'password';
+}
+
+function login() {
+  const role = document.getElementById('role').value;
+  const pass = document.getElementById('password').value;
+  if (pass !== passwords[role]) {
+    alert('Sai mật khẩu'); 
+    return;
+  }
+  currentUserRole = role;
+  document.getElementById('editForm').style.display = role === 'lecturer' ? 'block' : 'none';
+  document.querySelector('.login').style.display = 'none';
+  document.querySelector('.month-filter').style.display = 'block';
+  render();
+}
+
+// Hàm parse giờ (string "HH:MM-HH:MM") thành mảng phút [start, end]
+function parseTimeRange(str) {
+  const [start, end] = str.split('-');
+  return [parseTime(start), parseTime(end)];
+}
+// Hàm parse 1 thời gian "HH:MM" thành số phút trong ngày
+function parseTime(t) {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+}
+// Lấy campus từ phòng, ví dụ "ADV, A.103" -> "ADV"
+function getCampus(room) {
+  return room.split(',')[0].trim().toUpperCase();
+}
+// Kiểm tra 2 khoảng thời gian có trùng (cùng ngày, cùng buổi)
+function overlap(t1, t2) {
+  const [s1, e1] = parseTimeRange(t1);
+  const [s2, e2] = parseTimeRange(t2);
+  return !(e1 <= s2 || e2 <= s1);
+}
+// Kiểm tra môn có trong tháng đang lọc không
+function inMonth(cls) {
+  if (!filterMonth) return true;
+  if (!cls.start || !cls.end) return true;
+  const [y,m] = filterMonth.split('-').map(Number);
+  // Lấy ngày đầu tháng và cuối tháng
+  const startMonth = new Date(y, m-1, 1);
+  const endMonth = new Date(y, m, 0);
+  const startCls = new Date(cls.start);
+  const endCls = new Date(cls.end);
+  // Môn học bắt đầu trong tháng hoặc đang học trong tháng (cắt ngang tháng)
+  return !(endCls < startMonth || startCls > endMonth);
+}
+// Kiểm tra phòng có môn học hiển thị tháng hiện tại không
+function roomHasClass(room) {
+  if (!schedule[room]) return false;
+  for (const day in schedule[room]) {
+    const classes = schedule[room][day];
+    if (classes.some(c => inMonth(c))) return true;
+  }
+  return false;
+}
+// Lấy các môn trong cùng ngày & buổi (dùng để check trùng giờ & cảnh báo khác cơ sở)
+function getClassesInSession(day, session) {
+  const classes = [];
+  for (const room in schedule) {
+    if (!schedule[room][day]) continue;
+    schedule[room][day].forEach(c => {
+      if (inMonth(c) && c.session === session) {
+        classes.push(c);
+      }
+    });
+  }
+  return classes;
+}
+
+let filterMonth = null;
+
+function addClass() {
+  const data = {
+    subject: document.getElementById('subject').value.trim(),
+    type: document.getElementById('type').value,
+    credits: document.getElementById('credits').value.trim(),
+    code: document.getElementById('code').value.trim(),
+    day: document.getElementById('day').value,
+    session: document.getElementById('session').value,
+    time: document.getElementById('time').value.trim(),
+    room: document.getElementById('room').value.trim(),
+    lecturer: document.getElementById('lecturer').value.trim(),
+    start: document.getElementById('start').value,
+    end: document.getElementById('end').value
+  };
+
+  if (!data.subject || !data.day || !data.session || !data.time || !data.room || !data.start || !data.end) {
+    alert('Vui lòng nhập đầy đủ các trường bắt buộc.');
+    return;
+  }
+  // Khởi tạo trong schedule
+  if (!schedule[data.room]) schedule[data.room] = {};
+  if (!schedule[data.room][data.day]) schedule[data.room][data.day] = [];
+
+  schedule[data.room][data.day].push(data);
+  localStorage.setItem('schedule', JSON.stringify(schedule));
+  clearForm();
+  render();
+}
+
+function clearForm() {
+  ['subject','type','credits','code','day','session','time','room','lecturer','start','end'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.value = '';
+  });
+  document.getElementById('type').value = 'LT';
+  document.getElementById('day').value = 'Thứ 2';
+  document.getElementById('session').value = 'Sáng';
+}
+
+function render() {
+  const tbody = document.querySelector('#tkb tbody');
+  tbody.innerHTML = '';
+
+  Object.keys(schedule).sort()
+    .filter(room => roomHasClass(room))
+    .forEach(room => {
+      let rowHTML = `<td><b>${room}</b></td>`;
+      ['Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7'].forEach(dayName => {
+        let cellHTML = '';
+        if (schedule[room][dayName]) {
+          // Lọc môn trong tháng
+          const classesInMonth = schedule[room][dayName].filter(c => inMonth(c));
+          if(classesInMonth.length > 0){
+            // Lấy tất cả môn cùng ngày & buổi (để check conflict + khác cơ sở)
+            const allSessionClasses = getClassesInSession(dayName, classesInMonth[0].session);
+
+            classesInMonth.forEach(c => {
+              // Kiểm tra conflict giờ
+              const isConflict = allSessionClasses.some(o => o !== c && overlap(o.time, c.time));
+              // Kiểm tra khác cơ sở
+              const campuses = new Set(allSessionClasses.map(x => getCampus(x.room)));
+              const campusWarning = campuses.size > 1 ? '<div class="campus-warning">⚠ Khác cơ sở trong buổi học</div>' : '';
+
+              cellHTML += `
+                <div class="cell-item ${isConflict ? 'conflict' : ''}">
+                  <div class="subject-name">${c.subject} (${c.type}) – ${c.credits} TC</div>
+                  <div>Mã học phần: ${c.code}</div>
+                  <div>${c.session} ${c.time}</div>
+                  <div>${c.room}</div>
+                  <div class="lecturer">GV: ${c.lecturer}</div>
+                  ${campusWarning}
+                  <button onclick="deleteClass('${room}', '${dayName}', ${schedule[room][dayName].indexOf(c)})">Xóa</button>
+                </div>
+              `;
+            });
+          }
+        }
+        rowHTML += `<td>${cellHTML}</td>`;
+      });
+      tbody.innerHTML += `<tr>${rowHTML}</tr>`;
+    });
+}
+
+function deleteClass(room, day, index) {
+  if (!confirm('Xóa môn này?')) return;
+  schedule[room][day].splice(index,1);
+  if (!schedule[room][day].length) delete schedule[room][day];
+  if (!Object.keys(schedule[room]).length) delete schedule[room];
+  localStorage.setItem('schedule', JSON.stringify(schedule));
+  render();
+}
+
+document.getElementById('monthFilter').addEventListener('change', e => {
+  filterMonth = e.target.value;
+  render();
+});
+
+</script>
+</body>
+</html>
